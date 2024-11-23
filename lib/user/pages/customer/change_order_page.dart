@@ -88,40 +88,48 @@ Future<void> fetchProducts() async {
   }
 
   Future<void> updateOrder() async {
-    if (_formKey.currentState!.validate()) {
-      final formattedPhone = formatPhoneNumber(_phoneController.text);
+  if (_formKey.currentState!.validate()) {
+    final formattedPhone = formatPhoneNumber(_phoneController.text);
+    debugPrint('Formatted phone: $formattedPhone');
+    debugPrint('Selected product ID: $selectedProductId');
+    debugPrint('Updating order with order ID: ${widget.orderData['order_id']}');
 
-      final response = await http.post(
-        Uri.parse(API.updateOrder),
-        body: {
-          'order_id': widget.orderData['order_id'].toString(),
-          'receiver_name': _nameController.text,
-          'receiver_phone': formattedPhone,
-          'receiver_address': _addressController.text,
-          'receiver_zip_code': _zipCodeController.text,
-          'product_id': selectedProductId!,
-        },
-      );
+    final response = await http.post(
+      Uri.parse(API.updateOrder),
+      body: {
+        'order_id': widget.orderData['order_id'].toString(),
+        'receiver_name': _nameController.text,
+        'receiver_phone': formattedPhone,
+        'receiver_address': _addressController.text,
+        'receiver_zip_code': _zipCodeController.text,
+        'product_id': selectedProductId!,
+      },
+    );
 
-      if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body);
-        if (jsonResponse['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order updated successfully')),
-          );
-          Navigator.pop(context, true); // 성공 시 true 반환
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
-        }
+    debugPrint('Response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      debugPrint('Parsed JSON: $jsonResponse');
+
+      if (jsonResponse['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order updated successfully')),
+        );
+        Navigator.pop(context, true); // 성공 시 true 반환
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update order')),
+          SnackBar(content: Text(jsonResponse['message'])),
         );
       }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update order')),
+      );
     }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

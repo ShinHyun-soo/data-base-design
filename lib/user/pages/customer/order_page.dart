@@ -83,48 +83,57 @@ class _OrderPageState extends State<OrderPage> {
   }
 
   Future<void> submitOrder() async {
-    if (_formKey.currentState!.validate()) {
-      final formattedPhone = formatPhoneNumber(_phoneController.text);
-      final zipCodeValid = await validateZipCode(_zipCodeController.text);
+  if (_formKey.currentState!.validate()) {
+    final formattedPhone = formatPhoneNumber(_phoneController.text);
+    debugPrint('Formatted phone: $formattedPhone');
+    debugPrint('Validating zip code: ${_zipCodeController.text}');
+    final zipCodeValid = await validateZipCode(_zipCodeController.text);
 
-      if (!zipCodeValid) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid Zip Code')),
-        );
-        return;
-      }
-
-      final response = await http.post(
-        Uri.parse(API.addOrderWithReceiver),
-        body: {
-          'receiver_name': _nameController.text,
-          'receiver_phone': formattedPhone,
-          'receiver_address': _addressController.text,
-          'receiver_zip_code': _zipCodeController.text,
-          'product_id': selectedProductId!,
-        },
+    if (!zipCodeValid) {
+      debugPrint('Invalid zip code');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid Zip Code')),
       );
+      return;
+    }
 
-      if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body);
-        if (jsonResponse['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order created successfully')),
-          );
-          widget.onOrderSuccess();
-          Navigator.pop(context);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
-        }
+    debugPrint('Submitting order with product ID: $selectedProductId');
+    final response = await http.post(
+      Uri.parse(API.addOrderWithReceiver),
+      body: {
+        'receiver_name': _nameController.text,
+        'receiver_phone': formattedPhone,
+        'receiver_address': _addressController.text,
+        'receiver_zip_code': _zipCodeController.text,
+        'product_id': selectedProductId!,
+      },
+    );
+
+    debugPrint('Response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      debugPrint('Parsed JSON: $jsonResponse');
+
+      if (jsonResponse['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order created successfully')),
+        );
+        widget.onOrderSuccess();
+        Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create order')),
+          SnackBar(content: Text(jsonResponse['message'])),
         );
       }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to create order')),
+      );
     }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

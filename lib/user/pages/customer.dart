@@ -25,70 +25,82 @@ class _CustomerPageState extends State<CustomerPage> {
   }
 
   Future<void> fetchOrders() async {
-    try {
-      final response = await http.get(Uri.parse(API.getOrders));
-      if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body);
-        if (jsonResponse['success']) {
-          setState(() {
-            orders = jsonResponse['data'];
-            isLoading = false;
-          });
-        } else {
-          setState(() {
-            isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
-        }
+  try {
+    debugPrint('Fetching orders...');
+    final response = await http.get(Uri.parse(API.getOrders));
+    debugPrint('Response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      debugPrint('Parsed JSON: $jsonResponse');
+
+      if (jsonResponse['success']) {
+        setState(() {
+          orders = jsonResponse['data'];
+          isLoading = false;
+        });
+        debugPrint('Orders fetched: $orders');
       } else {
         setState(() {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to fetch orders')),
+          SnackBar(content: Text(jsonResponse['message'])),
         );
       }
-    } catch (e) {
+    } else {
       setState(() {
         isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        const SnackBar(content: Text('Failed to fetch orders')),
       );
     }
+  } catch (e) {
+    debugPrint('Error fetching orders: $e');
+    setState(() {
+      isLoading = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e')),
+    );
   }
+}
+
 
   Future<void> cancelOrder(String orderId) async {
-    try {
-      final response = await http.post(
-        Uri.parse(API.deleteOrder),
-        body: {'order_id': orderId},
-      );
-      if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body);
-        if (jsonResponse['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order canceled successfully')),
-          );
-          fetchOrders(); // Refresh orders after cancellation
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
-        }
+  try {
+    final response = await http.post(
+      Uri.parse(API.deleteOrder),
+      body: {'order_id': orderId},
+    );
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      if (jsonResponse['success']) {
+        setState(() {
+          orders.removeWhere((order) => order['order_id'].toString() == orderId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order canceled successfully')),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to cancel order')),
+          SnackBar(content: Text(jsonResponse['message'])),
         );
       }
-    } catch (e) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        const SnackBar(content: Text('Failed to cancel order')),
       );
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e')),
+    );
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
