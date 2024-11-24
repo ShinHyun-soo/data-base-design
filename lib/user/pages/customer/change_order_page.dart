@@ -108,11 +108,15 @@ Future<void> fetchProducts() async {
 
     debugPrint('Response status: ${response.statusCode}');
     debugPrint('Response body: ${response.body}');
+
     if (response.statusCode == 200) {
       final jsonResponse = json.decode(response.body);
       debugPrint('Parsed JSON: $jsonResponse');
 
       if (jsonResponse['success']) {
+        // Parcel 업데이트 로직 추가
+        await updateParcelPersonnel();
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Order updated successfully')),
         );
@@ -129,6 +133,39 @@ Future<void> fetchProducts() async {
     }
   }
 }
+
+Future<void> updateParcelPersonnel() async {
+  try {
+    final response = await http.post(
+      Uri.parse(API.updateParcelPersonnel),
+      body: {
+        'order_id': widget.orderData['order_id'].toString(),
+        'receiver_zip_code': _zipCodeController.text,
+      },
+    );
+
+    debugPrint('Update Parcel Personnel Response: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      if (!jsonResponse['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(jsonResponse['message'])),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update parcel personnel')),
+      );
+    }
+  } catch (e) {
+    debugPrint('Error updating parcel personnel: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e')),
+    );
+  }
+}
+
 
 
   @override

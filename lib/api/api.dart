@@ -14,5 +14,13 @@ class API {
   static const deleteOrder = "$hostConnectUser/deleteOrder.php";
   static const getOrders = "$hostConnectUser/getOrders.php";
   static const validateZipCode = "$hostConnectUser/validateZipCode.php";
+  static const updateParcelPersonnel = "$hostConnectUser/updateParcelPersonnel.php";
+  static const updateCurrentState = "$hostConnectUser/updateCurrentState.php";
+  static const getOrderDetails = "$hostConnectUser/getOrderDetails.php";
 
+  static const getAvailableParcels = "$hostConnectUser/getAvailableParcels.php";
+  static const submitInquiry = "$hostConnectUser/submitInquiry.php";
+  static const getInquiryDetails = "$hostConnectUser/getInquiryDetails.php";
+  static const deleteInquiry = "$hostConnectUser/deleteInquiry.php";
+  static const changeInquiry = "$hostConnectUser/changeInquiry.php";
 }
