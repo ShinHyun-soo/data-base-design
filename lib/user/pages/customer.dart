@@ -23,136 +23,97 @@ class _CustomerPageState extends State<CustomerPage> {
   @override
   void initState() {
     super.initState();
+    debugPrintUserId();
     fetchOrders();
+  }
+
+  Future<void> debugPrintUserId() async {
+    final userId = await getUserId();
+    debugPrint('Logged-in user_id: $userId');
+    if (userId == null) {
+      _showSnackBar('No user_id found. Please log in again.', isError: true);
+    }
   }
 
   Future<void> fetchOrders() async {
     try {
-      debugPrint('Fetching orders...');
-      final response = await http.get(Uri.parse(API.getOrders));
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
+      final userId = await getUserId();
+      if (userId == null) throw Exception('User ID not found');
+
+      final response = await http.post(
+        Uri.parse(API.getOrders),
+        body: {'user_id': userId.toString()},
+      );
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
-        debugPrint('Parsed JSON: $jsonResponse');
-
         if (jsonResponse['success']) {
           setState(() {
             orders = jsonResponse['data'];
             isLoading = false;
           });
-          debugPrint('Orders fetched: $orders');
         } else {
-          setState(() {
-            isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
+          _showSnackBar(jsonResponse['message'], isError: true);
         }
       } else {
-        setState(() {
-          isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to fetch orders')),
-        );
+        _showSnackBar('Failed to fetch orders', isError: true);
       }
     } catch (e) {
-      debugPrint('Error fetching orders: $e');
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showSnackBar('Error fetching orders: $e', isError: true);
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
-  Future<void> cancelOrder(String orderId) async {
+  Future<void> deleteOrder(String orderId) async {
     try {
       final response = await http.post(
         Uri.parse(API.deleteOrder),
         body: {'order_id': orderId},
       );
+
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         if (jsonResponse['success']) {
-          setState(() {
-            orders.removeWhere((order) => order['order_id'].toString() == orderId);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order canceled successfully')),
-          );
+          _showSnackBar('Order deleted successfully');
+          fetchOrders();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
+          _showSnackBar(jsonResponse['message'], isError: true);
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to cancel order')),
-        );
+        _showSnackBar('Failed to delete order', isError: true);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
-
-  Future<void> updateCurrentState() async {
-    try {
-      final response = await http.get(Uri.parse(API.updateCurrentState));
-      if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body);
-        if (jsonResponse['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
-        }
-      }
-      fetchOrders();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating state: $e')),
-      );
+      _showSnackBar('Error deleting order: $e', isError: true);
     }
   }
 
   Future<int?> getUserId() async {
-  final prefs = await SharedPreferences.getInstance();
-  
-  // 먼저 확인
-  final userIdString = prefs.getString('user_id');
-  
-  // String을 int로 변환
-  if (userIdString != null) {
-    try {
-      return int.parse(userIdString); // int로 변환
-    } catch (e) {
-      debugPrint('Error parsing user_id to int: $e');
-      return null; // 변환 실패 시 null 반환
-    }
+    final prefs = await SharedPreferences.getInstance();
+    final userIdString = prefs.getString('user_id');
+    if (userIdString != null) return int.tryParse(userIdString);
+    return prefs.getInt('user_id');
   }
 
-  return prefs.getInt('user_id'); // 기존에 int로 저장된 값도 확인
-}
-
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Customer Screen'),
+        title: const Text('Customer Orders'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
+          onPressed: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('user_id');
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -161,66 +122,7 @@ class _CustomerPageState extends State<CustomerPage> {
           },
         ),
       ),
-      endDrawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.blue,
-              ),
-              child: const Text(
-                'Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.refresh),
-              title: const Text('새로고침'),
-              onTap: () {
-                Navigator.pop(context);
-                updateCurrentState();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.message),
-              title: const Text('문의 페이지'),
-              onTap: () async {
-                final userId = await getUserId();
-                if (userId != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CreateInquiryPage(userId: userId),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('User not logged in')),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.shopping_cart),
-              title: const Text('주문 페이지'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => OrderPage(
-                      onOrderSuccess: () => fetchOrders(),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+      endDrawer: _buildDrawer(),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : orders.isEmpty
@@ -229,82 +131,170 @@ class _CustomerPageState extends State<CustomerPage> {
                   itemCount: orders.length,
                   itemBuilder: (context, index) {
                     final order = orders[index];
-                    return Card(
-                      margin: const EdgeInsets.all(8.0),
-                      child: ListTile(
-                        title: Text('Receiver Name: ${order['receiver_name']}'),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Phone: ${order['receiver_phone']}'),
-                            Text('Address: ${order['receiver_address']}'),
-                            Text('Zip Code: ${order['receiver_zip_code'] ?? "Not Available"}'),
-                            Text('Product: ${order['product_name']}'),
-                            Text('Order Date: ${order['order_date']}'),
-                            Text('Delivery Date: ${order['availability_date']}'),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.search, color: Colors.green),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DetailOrderPage(orderId: int.parse(order['order_id'])),
-                                  ),
-                                );
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () async {
-                                final updated = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        ChangeOrderPage(orderData: order),
-                                  ),
-                                );
-                                if (updated == true) {
-                                  fetchOrders();
-                                }
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Cancel Order'),
-                                    content: const Text(
-                                        'Are you sure you want to cancel this order?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('No'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                          cancelOrder(order['order_id']);
-                                        },
-                                        child: const Text('Yes'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+                    return _buildOrderCard(order);
+                  },
+                ),
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          const DrawerHeader(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue, Colors.lightBlueAccent],
+              ),
+            ),
+            child: Text(
+              'Menu',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          _buildDrawerItem(
+            icon: Icons.refresh,
+            text: '새로고침',
+            onTap: () {
+              Navigator.pop(context);
+              fetchOrders();
+            },
+          ),
+          _buildDrawerItem(
+            icon: Icons.message,
+            text: '문의 페이지',
+            onTap: () async {
+              final userId = await getUserId();
+              if (userId != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CreateInquiryPage(userId: userId),
+                  ),
+                );
+              } else {
+                _showSnackBar('User not logged in', isError: true);
+              }
+            },
+          ),
+          _buildDrawerItem(
+            icon: Icons.shopping_cart,
+            text: '주문 페이지',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => OrderPage(onOrderSuccess: fetchOrders),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.blue),
+      title: Text(text),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildOrderCard(Map<String, dynamic> order) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.all(12),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Receiver: ${order['receiver_name']}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('Phone: ${order['receiver_phone']}'),
+            Text('Address: ${order['receiver_address']}'),
+            Text('Delivery Date: ${order['availability_date']}'),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DetailOrderPage(
+                          orderId: order['order_id'],
                         ),
                       ),
                     );
                   },
+                  icon: const Icon(Icons.info, size: 16),
+                  label: const Text('Details'),
                 ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final updated = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ChangeOrderPage(orderData: order),
+                      ),
+                    );
+                    if (updated == true) fetchOrders();
+                  },
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('Edit'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Order'),
+                        content:
+                            const Text('Are you sure you want to delete this order?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              deleteOrder(order['order_id'].toString());
+                            },
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:sample_001/api/api.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderPage extends StatefulWidget {
   final Function onOrderSuccess;
@@ -40,100 +41,81 @@ class _OrderPageState extends State<OrderPage> {
           isLoading = false;
         });
       } else {
-        setState(() {
-          isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load products')),
-        );
+        setState(() => isLoading = false);
+        _showSnackBar('Failed to load products', isError: true);
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      setState(() => isLoading = false);
+      _showSnackBar('Error: $e', isError: true);
     }
   }
 
-  String formatPhoneNumber(String phone) {
-    phone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (phone.length >= 11) {
-      return '${phone.substring(0, 3)}-${phone.substring(3, 7)}-${phone.substring(7, 11)}';
+  Future<int?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userIdString = prefs.getString('user_id');
+    if (userIdString != null) {
+      return int.tryParse(userIdString);
     }
-    return phone;
+    return null;
   }
 
-  Future<bool> validateZipCode(String zipCode) async {
-    try {
-      final response = await http.post(
-        Uri.parse(API.validateZipCode),
-        body: {'zip_code': zipCode},
-      );
-      if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body);
-        return jsonResponse['success'];
-      } else {
-        return false;
-      }
-    } catch (e) {
-      return false;
-    }
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+      ),
+    );
   }
 
   Future<void> submitOrder() async {
-  if (_formKey.currentState!.validate()) {
-    final formattedPhone = formatPhoneNumber(_phoneController.text);
-    debugPrint('Formatted phone: $formattedPhone');
-    debugPrint('Validating zip code: ${_zipCodeController.text}');
-    final zipCodeValid = await validateZipCode(_zipCodeController.text);
-
-    if (!zipCodeValid) {
-      debugPrint('Invalid zip code');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid Zip Code')),
-      );
-      return;
-    }
-
-    debugPrint('Submitting order with product ID: $selectedProductId');
-    final response = await http.post(
-      Uri.parse(API.addOrderWithReceiver),
-      body: {
-        'receiver_name': _nameController.text,
-        'receiver_phone': formattedPhone,
-        'receiver_address': _addressController.text,
-        'receiver_zip_code': _zipCodeController.text,
-        'product_id': selectedProductId!,
-      },
-    );
-
-    debugPrint('Response status: ${response.statusCode}');
-    debugPrint('Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      debugPrint('Parsed JSON: $jsonResponse');
-
-      if (jsonResponse['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order created successfully')),
-        );
-        widget.onOrderSuccess();
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(jsonResponse['message'])),
-        );
+    if (_formKey.currentState!.validate()) {
+      final userId = await getUserId();
+      if (userId == null) {
+        _showSnackBar('User ID not found. Please log in again.', isError: true);
+        return;
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to create order')),
+
+      final response = await http.post(
+        Uri.parse(API.addOrderWithReceiver),
+        body: {
+          'receiver_name': _nameController.text,
+          'receiver_phone': _phoneController.text,
+          'receiver_address': _addressController.text,
+          'receiver_zip_code': _zipCodeController.text,
+          'product_id': selectedProductId!,
+          'user_id': userId.toString(),
+        },
       );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        if (jsonResponse['success']) {
+          _showSnackBar('Order created successfully');
+          widget.onOrderSuccess();
+          Navigator.pop(context);
+        } else {
+          _showSnackBar(jsonResponse['message'], isError: true);
+        }
+      } else {
+        _showSnackBar('Failed to create order', isError: true);
+      }
     }
   }
-}
 
+  String _formatPhoneNumber(String input) {
+    final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length >= 11) {
+      return '${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7, 11)}';
+    } else if (digits.length >= 7) {
+      return '${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7)}';
+    } else if (digits.length >= 4) {
+      return '${digits.substring(0, 3)}-${digits.substring(3)}';
+    } else {
+      return digits;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,43 +131,52 @@ class _OrderPageState extends State<OrderPage> {
                 key: _formKey,
                 child: ListView(
                   children: [
-                    TextFormField(
+                    _buildTextField(
                       controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Receiver Name'),
-                      validator: (value) =>
-                          value == null || value.isEmpty ? 'Please enter receiver name' : null,
+                      labelText: 'Receiver Name',
+                      icon: Icons.person,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Please enter receiver name'
+                          : null,
                     ),
-                    TextFormField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: _phoneController,
-                      decoration: const InputDecoration(labelText: 'Receiver Phone'),
+                      labelText: 'Receiver Phone',
+                      icon: Icons.phone,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
                       onChanged: (value) {
-                        final formatted = formatPhoneNumber(value);
+                        final formattedPhone = _formatPhoneNumber(value);
                         _phoneController.value = TextEditingValue(
-                          text: formatted,
-                          selection: TextSelection.collapsed(offset: formatted.length),
+                          text: formattedPhone,
+                          selection: TextSelection.collapsed(offset: formattedPhone.length),
                         );
                       },
                       validator: (value) {
                         final phoneRegex = RegExp(r'^010-\d{4}-\d{4}$');
                         if (value == null || value.isEmpty || !phoneRegex.hasMatch(value)) {
-                          return 'Please enter a valid phone number';
+                          return 'Please enter a valid phone number (e.g., 010-1234-5678)';
                         }
                         return null;
                       },
                     ),
-                    TextFormField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: _addressController,
-                      decoration: const InputDecoration(labelText: 'Receiver Address'),
-                      validator: (value) =>
-                          value == null || value.isEmpty ? 'Please enter receiver address' : null,
+                      labelText: 'Receiver Address',
+                      icon: Icons.location_on,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Please enter receiver address'
+                          : null,
                     ),
-                    TextFormField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: _zipCodeController,
-                      decoration: const InputDecoration(labelText: 'Receiver Zip Code'),
+                      labelText: 'Receiver Zip Code',
+                      icon: Icons.local_post_office,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(5),
@@ -225,14 +216,42 @@ class _OrderPageState extends State<OrderPage> {
                       validator: (value) => value == null ? 'Please select a product' : null,
                     ),
                     const SizedBox(height: 20),
-                    ElevatedButton(
+                    ElevatedButton.icon(
                       onPressed: submitOrder,
-                      child: const Text('Submit Order'),
+                      icon: const Icon(Icons.send),
+                      label: const Text('Submit Order'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+    void Function(String)? onChanged,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: labelText,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+      inputFormatters: inputFormatters,
+      validator: validator,
+      onChanged: onChanged,
     );
   }
 }

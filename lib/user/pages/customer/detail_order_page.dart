@@ -24,6 +24,7 @@ class _DetailOrderPageState extends State<DetailOrderPage> {
   }
 
   Future<void> fetchOrderDetails() async {
+    setState(() => isLoading = true);
     try {
       final response = await http.post(
         Uri.parse(API.getOrderDetails),
@@ -35,63 +36,40 @@ class _DetailOrderPageState extends State<DetailOrderPage> {
         if (jsonResponse['success']) {
           setState(() {
             orderDetails = jsonResponse['data'];
-            isLoading = false;
           });
           fetchInquiryDetails();
         } else {
-          setState(() {
-            isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
+          _showSnackBar(jsonResponse['message'], isError: true);
         }
       } else {
-        setState(() {
-          isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to fetch order details')),
-        );
+        _showSnackBar('Failed to fetch order details', isError: true);
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showSnackBar('Error fetching order details: $e', isError: true);
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
   Future<void> fetchInquiryDetails() async {
-  try {
-    final response = await http.post(
-      Uri.parse(API.getInquiryDetails),
-      body: {'order_id': widget.orderId.toString()},
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(API.getInquiryDetails),
+        body: {'order_id': widget.orderId.toString()},
+      );
 
-    if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      if (jsonResponse['success']) {
-        setState(() {
-          inquiryDetails = jsonResponse['data'];
-        });
-        debugPrint('Fetched Inquiry Details: $inquiryDetails');
-      } else {
-        debugPrint('Failed to fetch inquiry details: ${jsonResponse['message']}');
-        inquiryDetails = null;
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        if (jsonResponse['success']) {
+          setState(() {
+            inquiryDetails = jsonResponse['data'];
+          });
+        }
       }
-    } else {
-      debugPrint('Failed to fetch inquiry details. Status code: ${response.statusCode}');
-      inquiryDetails = null;
+    } catch (e) {
+      _showSnackBar('Error fetching inquiry details: $e', isError: true);
     }
-  } catch (e) {
-    debugPrint('Error fetching inquiry details: $e');
-    inquiryDetails = null;
   }
-}
-
 
   Future<void> deleteInquiry(int inquiryId) async {
     try {
@@ -103,26 +81,18 @@ class _DetailOrderPageState extends State<DetailOrderPage> {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         if (jsonResponse['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
+          _showSnackBar('Inquiry deleted successfully');
           setState(() {
             inquiryDetails = null;
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
+          _showSnackBar(jsonResponse['message'], isError: true);
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete inquiry')),
-        );
+        _showSnackBar('Failed to delete inquiry', isError: true);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showSnackBar('Error deleting inquiry: $e', isError: true);
     }
   }
 
@@ -139,76 +109,76 @@ class _DetailOrderPageState extends State<DetailOrderPage> {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         if (jsonResponse['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
-          fetchInquiryDetails(); // Fetch updated details
+          _showSnackBar('Inquiry updated successfully');
+          fetchInquiryDetails();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
+          _showSnackBar(jsonResponse['message'], isError: true);
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update inquiry')),
-        );
+        _showSnackBar('Failed to update inquiry', isError: true);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showSnackBar('Error updating inquiry: $e', isError: true);
     }
   }
 
-  void showEditDialog() {
-  if (inquiryDetails == null || inquiryDetails!['inquiry_id'] == null) {
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Inquiry ID is not available')),
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error : Icons.check_circle,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+      ),
     );
-    return;
   }
 
-  final TextEditingController _editController = TextEditingController(
-    text: inquiryDetails!['inquiry_comment'],
-  );
+  void _showEditDialog() {
+    if (inquiryDetails == null || inquiryDetails!['inquiry_id'] == null) {
+      _showSnackBar('Inquiry ID not available', isError: true);
+      return;
+    }
 
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Edit Inquiry'),
-      content: TextField(
-        controller: _editController,
-        decoration: const InputDecoration(
-          labelText: 'Inquiry Comment',
+    final _editController =
+        TextEditingController(text: inquiryDetails!['inquiry_comment']);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Inquiry'),
+        content: TextField(
+          controller: _editController,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            labelText: 'Inquiry Comment',
+          ),
         ),
-        maxLines: 5,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context);
-            if (inquiryDetails!['inquiry_id'] != null) {
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
               updateInquiry(
                 inquiryDetails!['inquiry_id'] as int,
                 _editController.text,
               );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Invalid Inquiry ID')),
-              );
-            }
-          },
-          child: const Text('Save'),
-        ),
-      ],
-    ),
-  );
-}
-
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -224,58 +194,41 @@ class _DetailOrderPageState extends State<DetailOrderPage> {
                   padding: const EdgeInsets.all(16.0),
                   child: ListView(
                     children: [
-                      Text('User Name: ${orderDetails!['user_name'] ?? "Not Available"}'),
-                      Text('Receiver Name: ${orderDetails!['receiver_name']}'),
-                      Text('Phone: ${orderDetails!['receiver_phone']}'),
-                      Text('Address: ${orderDetails!['receiver_address']}'),
-                      Text('Zip Code: ${orderDetails!['receiver_zip_code']}'),
-                      Text('Product: ${orderDetails!['product_name']}'),
-                      Text('Order Date: ${orderDetails!['order_date']}'),
-                      Text('Delivery Date: ${orderDetails!['availability_date']}'),
-                      const SizedBox(height: 16),
-                      Text('Delivery Company: ${orderDetails!['company_name'] ?? "Not Available"}'),
-                      Text('Delivery Personnel: ${orderDetails!['personnel_name'] ?? "Not Available"}'),
-                      Text(
-                        'Current State: ${orderDetails!['current_state'] == 0 ? "In Transit" : "Delivered"}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: orderDetails!['current_state'] == 0
-                              ? Colors.orange
-                              : Colors.green,
-                        ),
+                      _buildSection('User Name', orderDetails!['user_name']),
+                      _buildSection('Receiver Name', orderDetails!['receiver_name']),
+                      _buildSection('Phone', orderDetails!['receiver_phone']),
+                      _buildSection('Address', orderDetails!['receiver_address']),
+                      _buildSection('Zip Code', orderDetails!['receiver_zip_code']),
+                      _buildSection('Product', orderDetails!['product_name']),
+                      _buildSection('Order Date', orderDetails!['order_date']),
+                      _buildSection('Delivery Date', orderDetails!['availability_date']),
+                      _buildSection('Delivery Company', orderDetails!['company_name']),
+                      _buildSection(
+                        'Current State',
+                        orderDetails!['current_state'] == 0 ? 'In Transit' : 'Delivered',
+                        highlight: true,
                       ),
                       if (inquiryDetails != null) ...[
                         const Divider(),
-                        Text(
-                          'Inquiry Status:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          inquiryDetails!['problem_state'] == 1
-                              ? 'Resolved'
-                              : 'Not Resolved',
-                          style: TextStyle(
-                            color: inquiryDetails!['problem_state'] == 1
-                                ? Colors.green
-                                : Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        const Text(
+                          'Inquiry Details',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 8),
-                        Text('${inquiryDetails!['inquiry_comment'] ?? "No comment available"}'),
+                        _buildSection('Problem State', inquiryDetails!['problem_state'] == 1 ? 'Resolved' : 'Not Resolved'),
+                        _buildSection('Comment', inquiryDetails!['inquiry_comment']),
+                        _buildSection('Report Comment', inquiryDetails!['report_comment']),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             IconButton(
                               onPressed: inquiryDetails!['problem_state'] == 1
-                                  ? null // 해결된 문의는 삭제 불가
+                                  ? null
                                   : () => deleteInquiry(inquiryDetails!['inquiry_id']),
                               icon: Icon(Icons.delete, color: inquiryDetails!['problem_state'] == 1 ? Colors.grey : Colors.red),
                             ),
                             IconButton(
-                              onPressed: inquiryDetails!['problem_state'] == 1
-                                  ? null // 해결된 문의는 수정 불가
-                                  : showEditDialog,
+                              onPressed: inquiryDetails!['problem_state'] == 1 ? null : _showEditDialog,
                               icon: Icon(Icons.edit, color: inquiryDetails!['problem_state'] == 1 ? Colors.grey : Colors.blue),
                             ),
                           ],
@@ -284,6 +237,32 @@ class _DetailOrderPageState extends State<DetailOrderPage> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildSection(String label, dynamic value, {bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Expanded(
+            child: Text(
+              value?.toString() ?? 'Not Available',
+              style: highlight
+                  ? TextStyle(
+                      color: value == 'In Transit' ? Colors.orange : Colors.green,
+                      fontWeight: FontWeight.bold,
+                    )
+                  : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

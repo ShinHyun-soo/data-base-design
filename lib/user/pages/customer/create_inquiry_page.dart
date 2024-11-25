@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:sample_001/api/api.dart';
 
 class CreateInquiryPage extends StatefulWidget {
-  final int userId; // 사용자 ID
+  final int userId;
 
   const CreateInquiryPage({Key? key, required this.userId}) : super(key: key);
 
@@ -27,68 +27,34 @@ class _CreateInquiryPageState extends State<CreateInquiryPage> {
 
   Future<void> fetchAvailableParcels() async {
     try {
-      debugPrint('Fetching available parcels for user ID: ${widget.userId}');
       final response = await http.post(
         Uri.parse(API.getAvailableParcels),
         body: {'user_id': widget.userId.toString()},
       );
 
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
-        debugPrint('Parsed JSON: $jsonResponse');
-
         if (jsonResponse['success']) {
           setState(() {
             parcels = jsonResponse['data'];
             isLoading = false;
           });
-          debugPrint('Available parcels: $parcels');
         } else {
-          setState(() {
-            isLoading = false;
-          });
-          debugPrint('Error message: ${jsonResponse['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(jsonResponse['message'])),
-          );
+          _showSnackBar(jsonResponse['message'], isError: true);
         }
       } else {
-        setState(() {
-          isLoading = false;
-        });
-        debugPrint('Failed to fetch parcels: ${response.body}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to fetch parcels')),
-        );
+        _showSnackBar('Failed to fetch parcels', isError: true);
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      debugPrint('Exception occurred while fetching parcels: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showSnackBar('Error fetching parcels: $e', isError: true);
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
   Future<void> submitInquiry() async {
     if (_formKey.currentState!.validate()) {
-      if (selectedParcelId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a parcel')),
-        );
-        return;
-      }
-
       try {
-        debugPrint('Submitting inquiry for user ID: ${widget.userId}');
-        debugPrint('Selected Parcel ID: $selectedParcelId');
-        debugPrint('Inquiry Comment: ${_inquiryController.text}');
-
         final response = await http.post(
           Uri.parse(API.submitInquiry),
           body: {
@@ -98,37 +64,30 @@ class _CreateInquiryPageState extends State<CreateInquiryPage> {
           },
         );
 
-        debugPrint('Response status: ${response.statusCode}');
-        debugPrint('Response body: ${response.body}');
-
         if (response.statusCode == 200) {
           final jsonResponse = json.decode(response.body);
-          debugPrint('Parsed JSON: $jsonResponse');
-
           if (jsonResponse['success']) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(jsonResponse['message'])),
-            );
+            _showSnackBar(jsonResponse['message']);
             Navigator.pop(context, true);
           } else {
-            debugPrint('Error message: ${jsonResponse['message']}');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(jsonResponse['message'])),
-            );
+            _showSnackBar(jsonResponse['message'], isError: true);
           }
         } else {
-          debugPrint('Failed to submit inquiry: ${response.body}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to submit inquiry')),
-          );
+          _showSnackBar('Failed to submit inquiry', isError: true);
         }
       } catch (e) {
-        debugPrint('Exception occurred while submitting inquiry: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        _showSnackBar('Error submitting inquiry: $e', isError: true);
       }
     }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+      ),
+    );
   }
 
   @override
@@ -146,26 +105,24 @@ class _CreateInquiryPageState extends State<CreateInquiryPage> {
                 child: ListView(
                   children: [
                     DropdownButtonFormField<String>(
-  value: selectedParcelId,
-  items: parcels.map<DropdownMenuItem<String>>((parcel) {
-    return DropdownMenuItem<String>(
-      value: parcel['parcel_id'].toString(),
-      child: Text('${parcel['description'] ?? 'Unknown'}'),
-    );
-  }).toList(),
-  onChanged: (value) {
-    setState(() {
-      selectedParcelId = value;
-    });
-  },
-  decoration: const InputDecoration(
-    labelText: 'Select Parcel',
-    border: OutlineInputBorder(),
-  ),
-  validator: (value) =>
-      value == null ? 'Please select a parcel' : null,
-),
-
+                      value: selectedParcelId,
+                      items: parcels.map<DropdownMenuItem<String>>((parcel) {
+                        return DropdownMenuItem<String>(
+                          value: parcel['parcel_id'].toString(),
+                          child: Text(parcel['description'] ?? 'Unknown Parcel'),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedParcelId = value;
+                        });
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Select Parcel',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) => value == null ? 'Please select a parcel' : null,
+                    ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _inquiryController,
@@ -182,9 +139,16 @@ class _CreateInquiryPageState extends State<CreateInquiryPage> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton(
+                    ElevatedButton.icon(
                       onPressed: submitInquiry,
-                      child: const Text('Submit Inquiry'),
+                      icon: const Icon(Icons.send),
+                      label: const Text('Submit Inquiry'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ],
                 ),
