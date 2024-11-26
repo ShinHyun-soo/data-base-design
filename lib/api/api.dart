@@ -39,4 +39,6 @@ class API {
 
   static const updateProblemState = "$hostConnectUser/updateProblemState.php";
   static const updateReportComment = "$hostConnectUser/updateReportComment.php";
+  
+  static const getRemoteOrders = "$hostConnectUser/getRemoteOrders.php";
 }

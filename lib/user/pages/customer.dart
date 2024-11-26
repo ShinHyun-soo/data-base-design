@@ -7,6 +7,7 @@ import 'package:sample_001/user/pages/customer/detail_order_page.dart';
 import 'package:sample_001/user/pages/customer/order_page.dart';
 import 'package:sample_001/user/pages/customer/create_inquiry_page.dart';
 import 'package:sample_001/user/pages/customer/change_order_page.dart';
+import 'package:sample_001/user/pages/customer/remote_order_page.dart';  
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CustomerPage extends StatefulWidget {
@@ -49,7 +50,9 @@ class _CustomerPageState extends State<CustomerPage> {
         final jsonResponse = json.decode(response.body);
         if (jsonResponse['success']) {
           setState(() {
-            orders = jsonResponse['data'];
+            orders = jsonResponse['data']
+                .where((order) => order['current_state'] == 0) // Only orders with current_state = 0
+                .toList();
             isLoading = false;
           });
         } else {
@@ -108,7 +111,7 @@ class _CustomerPageState extends State<CustomerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Customer Orders'),
+        title: const Text('고객 페이지'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {
@@ -166,6 +169,18 @@ class _CustomerPageState extends State<CustomerPage> {
             },
           ),
           _buildDrawerItem(
+            icon: Icons.shopping_cart,
+            text: '주문 페이지',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => OrderPage(onOrderSuccess: fetchOrders),
+                ),
+              );
+            },
+          ),
+          _buildDrawerItem(
             icon: Icons.message,
             text: '문의 페이지',
             onTap: () async {
@@ -183,13 +198,13 @@ class _CustomerPageState extends State<CustomerPage> {
             },
           ),
           _buildDrawerItem(
-            icon: Icons.shopping_cart,
-            text: '주문 페이지',
+            icon: Icons.list_alt,
+            text: '주문 관리', // 주문 관리 메뉴 항목 추가
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => OrderPage(onOrderSuccess: fetchOrders),
+                  builder: (context) => RemoteOrderPage(), // 주문 관리 페이지로 이동
                 ),
               );
             },
@@ -223,10 +238,7 @@ class _CustomerPageState extends State<CustomerPage> {
           children: [
             Text(
               'Receiver: ${order['receiver_name']}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text('Phone: ${order['receiver_phone']}'),

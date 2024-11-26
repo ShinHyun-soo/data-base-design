@@ -11,25 +11,26 @@ if (!$user_id) {
 }
 
 try {
+    // 현재 날짜를 구하기 위해 `CURDATE()` 사용
     $query = "
-    SELECT 
-        o.order_id,
-        r.receiver_name,
-        r.receiver_phone,
-        r.receiver_address,
-        r.receiver_zip_code,
-        p.product_id,   -- product_id를 추가
-        p.product_name,
-        o.order_date,
-        o.availability_date,
-        pa.current_state
-    FROM make_order o
-    JOIN receiver r ON o.receiver_id = r.receiver_id
-    JOIN product p ON o.product_id = p.product_id
-    LEFT JOIN parcel pa ON o.order_id = pa.order_id
-    WHERE o.user_id = ?
-";
-
+        SELECT 
+            o.order_id,
+            r.receiver_name,
+            r.receiver_phone,
+            r.receiver_address,
+            r.receiver_zip_code,
+            p.product_name,
+            o.order_date,
+            o.availability_date,
+            pa.current_state
+        FROM make_order o
+        JOIN receiver r ON o.receiver_id = r.receiver_id
+        JOIN product p ON o.product_id = p.product_id
+        LEFT JOIN parcel pa ON o.order_id = pa.order_id
+        WHERE o.user_id = ? 
+        AND pa.current_state = 1
+        AND DATEDIFF(CURDATE(), o.availability_date) <= 15
+    ";
 
     $stmt = $connection->prepare($query);
     if (!$stmt) {

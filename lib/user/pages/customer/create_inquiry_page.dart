@@ -94,7 +94,7 @@ class _CreateInquiryPageState extends State<CreateInquiryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Inquiry'),
+        title: const Text('문의 작성'),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

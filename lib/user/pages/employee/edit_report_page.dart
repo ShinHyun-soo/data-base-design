@@ -105,7 +105,7 @@ class _EditReportPageState extends State<EditReportPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Reports'),
+        title: const Text('문의관리'),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -128,13 +128,12 @@ class _EditReportPageState extends State<EditReportPage> {
                       ),
                       child: ListTile(
                         title: Text(
-                          'Inquiry ID: ${inquiryId ?? 'Unknown'}',
+                          'Issue: $issueName',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Issue: $issueName'),
                             Text(
                               'Comment: $reportComment',
                               maxLines: 2,

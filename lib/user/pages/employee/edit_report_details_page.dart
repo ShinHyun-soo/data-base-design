@@ -75,7 +75,7 @@ class _EditReportDetailsPageState extends State<EditReportDetailsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Report Details'),
+        title: const Text('문의 편집'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

@@ -99,7 +99,7 @@ class _EmployeePageState extends State<EmployeePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Employee Page'),
+        title: const Text('직원 페이지'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {
@@ -139,7 +139,7 @@ class _EmployeePageState extends State<EmployeePage> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: const Icon(Icons.arrow_forward, color: Colors.blue),
+                        trailing: const Icon(Icons.edit, color: Colors.blue),
                         onTap: () async {
                           final employeeId = await getEmployeeId();
                           if (employeeId != null) {
@@ -191,21 +191,34 @@ class _EmployeePageState extends State<EmployeePage> {
               ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.edit),
-            title: const Text('Edit Reports'),
-            onTap: navigateToEditReports,
-          ),
-          ListTile(
-            leading: const Icon(Icons.refresh),
-            title: const Text('Refresh'),
+          _buildDrawerItem(
+            icon: Icons.refresh,
+            text: '새로 고침',
             onTap: () {
               Navigator.pop(context);
               fetchInquiries();
             },
           ),
+          _buildDrawerItem(
+            icon: Icons.list_alt,
+            text: '문의 관리',
+            onTap: navigateToEditReports,
+          ),
+          
         ],
       ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.blue),
+      title: Text(text),
+      onTap: onTap,
     );
   }
 }

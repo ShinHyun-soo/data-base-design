@@ -184,7 +184,7 @@ class _DetailOrderPageState extends State<DetailOrderPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Order Details'),
+        title: const Text('상세 주문'),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -83,7 +83,7 @@ class _OrderPageState extends State<OrderPage> {
           'receiver_phone': _phoneController.text,
           'receiver_address': _addressController.text,
           'receiver_zip_code': _zipCodeController.text,
-          'product_id': selectedProductId!,
+          'product_id': selectedProductId!, // 선택된 product_id 추가
           'user_id': userId.toString(),
         },
       );
@@ -121,7 +121,7 @@ class _OrderPageState extends State<OrderPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Order Page'),
+        title: const Text('주문'),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -158,7 +158,7 @@ class _OrderPageState extends State<OrderPage> {
                       validator: (value) {
                         final phoneRegex = RegExp(r'^010-\d{4}-\d{4}$');
                         if (value == null || value.isEmpty || !phoneRegex.hasMatch(value)) {
-                          return 'Please enter a valid phone number (e.g., 010-1234-5678)';
+                          return 'Please enter a valid phone number';
                         }
                         return null;
                       },
@@ -204,9 +204,10 @@ class _OrderPageState extends State<OrderPage> {
                           child: Text(
                             '${product['product_name']} (Stock: $stock)',
                             style: TextStyle(
-                              color: stock == 0 ? Colors.red : Colors.black,
+                              color: stock == 0 ? Colors.grey : Colors.black,
                             ),
                           ),
+                          enabled: stock > 0, // stock이 0인 제품은 선택할 수 없게 설정
                         );
                       }).toList(),
                       decoration: const InputDecoration(
